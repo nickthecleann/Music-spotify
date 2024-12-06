@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-import { auth } from "@/auth";
+import { auth, signOut } from "@/auth";
 
 export default async function Home() {
 	const session = await auth();
@@ -35,6 +35,20 @@ export default async function Home() {
 						<p className="text-gray-500">{user?.email}</p>
 					</div>
 				</div>
+				<form
+					action={async () => {
+						"use server";
+						await signOut();
+					}}
+					className="mt-6"
+				>
+					<button
+						type="submit"
+						className="w-full bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 transition-colors"
+					>
+						Sign Out
+					</button>
+				</form>
 			</div>
 		</main>
 	);
