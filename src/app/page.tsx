@@ -44,7 +44,7 @@ export default async function Home() {
 				>
 					<button
 						type="submit"
-						className="w-full bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 transition-colors"
+						className="w-full bg-indigo-600 text-white py-2 px-4 rounded-xl hover:bg-indigo-700 transition-colors"
 					>
 						Sign Out
 					</button>
