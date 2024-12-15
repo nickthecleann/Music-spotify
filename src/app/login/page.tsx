@@ -28,6 +28,7 @@ export default function Login() {
 
 	const handleLogin = () => {
 		signIn("discord");
+		
 	};
 
 	return (

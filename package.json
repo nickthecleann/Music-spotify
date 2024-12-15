@@ -10,14 +10,22 @@
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.7.4",
+    "@distube/ytdl-core": "^4.15.3",
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
     "@prisma/client": "^6.0.1",
+    "fluent-ffmpeg": "^2.1.3",
     "lucide-react": "^0.468.0",
     "next": "15.0.4",
     "next-auth": "^5.0.0-beta.25",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "react-hot-toast": "^2.4.1",
+    "shadcn-ui": "^0.9.4",
+    "ytdl-core": "npm:@distube/ytdl-core@^4.15.3"
   },
   "devDependencies": {
+    "@shadcn/ui": "^0.0.4",
+    "@types/fluent-ffmpeg": "^2.1.27",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
