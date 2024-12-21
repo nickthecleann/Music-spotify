@@ -1,17 +1,6 @@
 import ytdl from 'ytdl-core';
 import fs from 'fs';
 import path from 'path';
-import ffmpeg from 'fluent-ffmpeg';
-import ffmpegPath from 'ffmpeg-static';
-import ffprobePath from 'ffprobe-static';
-
-// Explicitly set FFmpeg paths
-if (ffmpegPath) {
-    ffmpeg.setFfmpegPath(ffmpegPath);
-}
-if (ffprobePath?.path) {
-    ffmpeg.setFfprobePath(ffprobePath.path);
-}
 
 interface DownloadOptions {
     outputPath?: string;
@@ -30,14 +19,6 @@ export async function downloadYouTubeAudio(
     options: DownloadOptions = {}
 ): Promise<DownloadResult> {
     try {
-        // Validate FFmpeg installation
-        if (!ffmpegPath) {
-            throw new Error('FFmpeg path not found');
-        }
-
-        // Log FFmpeg path for debugging
-        console.log('FFmpeg Path:', ffmpegPath);
-
         if (!ytdl.validateURL(url)) {
             return { success: false, message: 'Invalid YouTube URL' };
         }
@@ -67,7 +48,7 @@ export async function downloadYouTubeAudio(
             fs.mkdirSync(outputPath, { recursive: true });
         }
 
-        // Download and process
+        // Download audio
         await new Promise<void>((resolve, reject) => {
             const stream = ytdl(url, {
                 quality: 'highestaudio',
@@ -81,32 +62,28 @@ export async function downloadYouTubeAudio(
                 reject(new Error(`YouTube download error: ${err.message}`));
             });
 
-            // Create FFmpeg command with explicit error handling
-            const command = ffmpeg(stream)
-                .toFormat('mp3')
-                .audioBitrate('128k');
+            // Create write stream
+            const writeStream = fs.createWriteStream(fullPath);
 
-            // Add FFmpeg event handlers
-            command
-                .on('start', (commandLine) => {
-                    console.log('FFmpeg command:', commandLine);
-                })
-                .on('progress', (progress) => {
-                    if (progress.percent) {
-                        console.log(`Processing: ${progress.percent.toFixed(2)}% done`);
-                    }
-                })
-                .on('end', () => {
-                    console.log('Processing finished');
-                    resolve();
-                })
-                .on('error', (err) => {
-                    console.error('FFmpeg processing error:', err);
-                    reject(new Error(`FFmpeg processing error: ${err.message}`));
-                });
+            writeStream.on('finish', () => {
+                console.log('Download finished');
+                resolve();
+            });
 
-            // Save the file
-            command.save(fullPath);
+            writeStream.on('error', (err) => {
+                console.error('File write error:', err);
+                reject(new Error(`File write error: ${err.message}`));
+            });
+
+            // Pipe the download to the file
+            stream.pipe(writeStream);
+
+            // Optional: Add progress tracking
+            let downloadedBytes = 0;
+            stream.on('data', (chunk) => {
+                downloadedBytes += chunk.length;
+                console.log(`Downloaded: ${(downloadedBytes / 1024 / 1024).toFixed(2)} MB`);
+            });
         });
 
         return {
