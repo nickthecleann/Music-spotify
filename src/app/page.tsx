@@ -34,7 +34,7 @@ export default function Home() {
   const { data: session, status: sessionStatus } = useSession();
   const router = useRouter();
 
-  // Effect to load songs from localStorage on mount
+  // Effect to load songs from localStorage on mountyo
   useEffect(() => {
     if (typeof window !== "undefined") {
       const savedSongs = localStorage.getItem("songs");
