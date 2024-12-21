@@ -1,10 +1,17 @@
-'use server'
-
-import ytdl from '@distube/ytdl-core'
+import ytdl from 'ytdl-core';
 import fs from 'fs';
 import path from 'path';
 import ffmpeg from 'fluent-ffmpeg';
-import toast from 'react-hot-toast';
+import ffmpegPath from 'ffmpeg-static';
+import ffprobePath from 'ffprobe-static';
+
+// Explicitly set FFmpeg paths
+if (ffmpegPath) {
+    ffmpeg.setFfmpegPath(ffmpegPath);
+}
+if (ffprobePath?.path) {
+    ffmpeg.setFfprobePath(ffprobePath.path);
+}
 
 interface DownloadOptions {
     outputPath?: string;
@@ -19,53 +26,87 @@ interface DownloadResult {
 }
 
 export async function downloadYouTubeAudio(
-    url: string, 
+    url: string,
     options: DownloadOptions = {}
 ): Promise<DownloadResult> {
     try {
-        // Validate URL
+        // Validate FFmpeg installation
+        if (!ffmpegPath) {
+            throw new Error('FFmpeg path not found');
+        }
+
+        // Log FFmpeg path for debugging
+        console.log('FFmpeg Path:', ffmpegPath);
+
         if (!ytdl.validateURL(url)) {
-            
             return { success: false, message: 'Invalid YouTube URL' };
-        } 
+        }
 
+        const videoId = ytdl.getVideoID(url);
+        console.log('Video ID:', videoId);
 
-        // Get video info
-        const info = await ytdl.getInfo(url);
+        const headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+        };
 
-        // Set default options
-        const outputPath = options.outputPath || './downloads';
-        const filename = options.filename || `${info.videoDetails.title}.mp3`;
-        const quality = options.quality || 'highest';
+        const info = await ytdl.getBasicInfo(url, {
+            requestOptions: { headers }
+        });
 
-        // Create output directory if it doesn't exist
+        const outputPath = options.outputPath || path.join(process.cwd(), 'public', 'audio');
+        const timestamp = Date.now();
+        const baseFilename = `${info.videoDetails.title.replace(/[^\w\s]/g, '').replace(/\s+/g, '-').toLowerCase()}-${timestamp}`;
+        const filename = options.filename || `${baseFilename}.mp3`;
+        const sanitizedFilename = filename.replace(/[/\\?%*:|"<>]/g, '-');
+        const fullPath = path.join(outputPath, sanitizedFilename);
+
+        // Ensure output directory exists
         if (!fs.existsSync(outputPath)) {
             fs.mkdirSync(outputPath, { recursive: true });
         }
 
-        // Clean filename by removing invalid characters
-        const sanitizedFilename = filename.replace(/[/\\?%*:|"<>]/g, '-');
-        const fullPath = path.join(outputPath, sanitizedFilename);
-
-        // Download and convert to audio using ffmpeg
+        // Download and process
         await new Promise<void>((resolve, reject) => {
             const stream = ytdl(url, {
                 quality: 'highestaudio',
                 filter: 'audioonly',
-                requestOptions: {
-                    headers: {
-                        'Cookie': process.env.YOUTUBE_COOKIE || '',
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-                    }
-                }
+                requestOptions: { headers },
+                highWaterMark: 1 << 25
             });
 
-            ffmpeg(stream)
-                .audioBitrate(128)
+            stream.on('error', (err) => {
+                console.error('YouTube download error:', err);
+                reject(new Error(`YouTube download error: ${err.message}`));
+            });
+
+            // Create FFmpeg command with explicit error handling
+            const command = ffmpeg(stream)
                 .toFormat('mp3')
-                .on('end', () => resolve())
-                .on('error', (err) => reject(err))
-                .save(fullPath);
+                .audioBitrate('128k');
+
+            // Add FFmpeg event handlers
+            command
+                .on('start', (commandLine) => {
+                    console.log('FFmpeg command:', commandLine);
+                })
+                .on('progress', (progress) => {
+                    if (progress.percent) {
+                        console.log(`Processing: ${progress.percent.toFixed(2)}% done`);
+                    }
+                })
+                .on('end', () => {
+                    console.log('Processing finished');
+                    resolve();
+                })
+                .on('error', (err) => {
+                    console.error('FFmpeg processing error:', err);
+                    reject(new Error(`FFmpeg processing error: ${err.message}`));
+                });
+
+            // Save the file
+            command.save(fullPath);
         });
 
         return {
@@ -75,9 +116,11 @@ export async function downloadYouTubeAudio(
         };
 
     } catch (error) {
+        console.error('Download error:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         return {
             success: false,
-            message: `Download failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+            message: `Download failed: ${errorMessage}`
         };
     }
 }
