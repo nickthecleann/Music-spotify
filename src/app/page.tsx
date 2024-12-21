@@ -31,7 +31,6 @@ export default function Home() {
     }
     return [];
   });
-
   const { data: session, status: sessionStatus } = useSession();
   const router = useRouter();
 
